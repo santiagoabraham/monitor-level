@@ -252,6 +252,8 @@ def main():
     hubo_cambio = any(
         prev.get(k) is not None and prev.get(k) != actual[k] for k in actual
     )
+    es_primera = not any(prev.get(k) is not None for k in actual)
+    forzar = os.environ.get("FORZAR_ALERTA", "").lower() in ("1", "true", "si", "yes")
     actual["actualizado"] = datetime.now().isoformat(timespec="seconds")
     guardar_estado(actual)
 
@@ -267,9 +269,14 @@ def main():
           f"= {m['total']} {MONEDA}  [{m['dias']} días]")
     print("*" * 64)
 
-    # ---- Alerta a Telegram (1ra corrida o cuando algo cambió) ----
-    if not prev or hubo_cambio:
-        encabezado = "PRIMERA MEDICIÓN" if not prev else "CAMBIO DE PRECIO"
+    # ---- Alerta a Telegram (1ra corrida, cambio de precio, o forzado) ----
+    if es_primera or hubo_cambio or forzar:
+        if forzar and not es_primera and not hubo_cambio:
+            encabezado = "RESUMEN ACTUAL (sin cambios)"
+        elif es_primera:
+            encabezado = "PRIMERA MEDICIÓN"
+        else:
+            encabezado = "CAMBIO DE PRECIO"
         variacion_total = variacion(actual['min_total'], prev.get('min_total'))
 
         # Top 10 combinaciones únicas más baratas (sin repetir par ida/vuelta)
