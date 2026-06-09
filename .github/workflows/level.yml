@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Descargar el repo
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Instalar Python
         uses: actions/setup-python@v6
@@ -41,4 +43,19 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add estado_level.json
-          git diff --staged --quiet || (git commit -m "Actualizar estado de precios [skip ci]" && git push)
+          if git diff --staged --quiet; then
+            echo "Estado sin cambios, no hay nada que guardar."
+            exit 0
+          fi
+          git commit -m "Actualizar estado de precios [skip ci]"
+          # Traer lo último del remoto y reintentar por si otra corrida pusheó mientras tanto
+          for intento in 1 2 3 4 5; do
+            if git pull --rebase --autostash origin main && git push; then
+              echo "Estado guardado correctamente."
+              exit 0
+            fi
+            echo "Push rechazado, reintento $intento..."
+            sleep 5
+          done
+          echo "No se pudo guardar el estado tras varios reintentos."
+          exit 1
