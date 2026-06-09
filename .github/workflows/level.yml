@@ -43,6 +43,7 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          FORZAR_ALERTA: "true"
         run: python level_bcn_analisis.py
 
       - name: Guardar el estado (solo si cambió)
