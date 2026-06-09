@@ -1,0 +1,44 @@
+name: Monitor LEVEL EZE-BCN
+
+# Se ejecuta cada 10 minutos y también permite correrlo a mano (botón "Run workflow")
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+# Necesario para que el job pueda guardar (commitear) el estado_level.json
+permissions:
+  contents: write
+
+# Evita que se solapen dos corridas si una tarda
+concurrency:
+  group: monitor-level
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repo
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install requests
+
+      - name: Ejecutar el monitor
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: python level_bcn_analisis.py
+
+      - name: Guardar el estado (solo si cambió)
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add estado_level.json
+          git diff --staged --quiet || (git commit -m "Actualizar estado de precios [skip ci]" && git push)
