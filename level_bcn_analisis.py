@@ -169,7 +169,7 @@ def variacion(actual, anterior):
     return f"sin cambios  [antes {anterior}]"
 
 
-def enviar_telegram(texto):
+def enviar_telegram(texto, parse_mode=None):
     """Envía un mensaje a Telegram si están configuradas las variables."""
     token = os.environ.get("TG_TOKEN")
     chat = os.environ.get("TG_CHAT_ID")
@@ -177,9 +177,12 @@ def enviar_telegram(texto):
         print("  (Telegram no configurado: faltan TG_TOKEN / TG_CHAT_ID)")
         return
     try:
+        data = {"chat_id": chat, "text": texto}
+        if parse_mode:
+            data["parse_mode"] = parse_mode
         requests.post(
             f"https://api.telegram.org/bot{token}/sendMessage",
-            data={"chat_id": chat, "text": texto},
+            data=data,
             timeout=15,
         )
         print("  Alerta enviada a Telegram.")
@@ -267,19 +270,32 @@ def main():
     # ---- Alerta a Telegram (1ra corrida o cuando algo cambió) ----
     if not prev or hubo_cambio:
         encabezado = "PRIMERA MEDICIÓN" if not prev else "CAMBIO DE PRECIO"
+        variacion_total = variacion(actual['min_total'], prev.get('min_total'))
+
+        # Top 10 combinaciones únicas más baratas (sin repetir par ida/vuelta)
+        top10 = sorted(
+            {(c["ida"], c["vuelta"]): c for c in combos}.values(),
+            key=lambda c: (c["total"], c["ida"])
+        )[:10]
+
+        lineas = []
+        ordinal = ["1°","2°","3°","4°","5°","6°","7°","8°","9°","10°"]
+        for i, c in enumerate(top10):
+            url = link(c["ida"], c["vuelta"])
+            # Link con texto legible (Telegram usa formato HTML)
+            lineas.append(
+                f'{ordinal[i]} {c["ida"]} → {c["vuelta"]} ({c["dias"]} días) '
+                f'= ({c["precio_ida"]}+{c["precio_vuelta"]}) {c["total"]} {MONEDA}\n'
+                f'<a href="{url}">Reservar</a>'
+            )
+
         msg = (
-            f"✈️ LEVEL {ORIGEN}-{DESTINO}  —  {encabezado}\n\n"
-            f"• Ida más barata:    {actual['min_ida']} {MONEDA}  "
-            f"({variacion(actual['min_ida'], prev.get('min_ida'))})\n"
-            f"• Vuelta más barata: {actual['min_vuelta']} {MONEDA}  "
-            f"({variacion(actual['min_vuelta'], prev.get('min_vuelta'))})\n"
-            f"• TOTAL más barato:  {actual['min_total']} {MONEDA}  "
-            f"({variacion(actual['min_total'], prev.get('min_total'))})\n\n"
-            f"Mejor combinación: {m['ida']} → {m['vuelta']} "
-            f"({m['dias']} días) = {m['total']} {MONEDA}\n"
-            f"{link(m['ida'], m['vuelta'])}"
+            f"✈️ LEVEL {ORIGEN}-{DESTINO}  —  {encabezado}\n"
+            f"Total más barato: {actual['min_total']} {MONEDA} ({variacion_total})\n\n"
+            f"Mejores combinaciones:\n\n" +
+            "\n\n".join(lineas)
         )
-        enviar_telegram(msg)
+        enviar_telegram(msg, parse_mode="HTML")
     else:
         print("\nSin cambios respecto a la última revisión: no se envía alerta.")
 
