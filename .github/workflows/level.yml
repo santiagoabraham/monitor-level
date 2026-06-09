@@ -5,6 +5,13 @@ on:
   schedule:
     - cron: "*/10 * * * *"
   workflow_dispatch:
+    inputs:
+      forzar_alerta:
+        description: 'Enviar alerta aunque no haya cambios (para probar)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
 
 # Necesario para que el job pueda guardar (commitear) el estado_level.json
 permissions:
